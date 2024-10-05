@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'game.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class HomeScreen extends StatelessWidget {
   TextEditingController _controllerQtd = new TextEditingController();
