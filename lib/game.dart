@@ -231,7 +231,7 @@ class _GameScreenState extends State<GameScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Nim Game')),
+      appBar: AppBar(title: Text('Nim Game'),centerTitle: true),
       body: Column(
         children: [
           Container(
