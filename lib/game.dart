@@ -1,8 +1,11 @@
 import 'dart:html';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'home.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 
 
 class GameScreen extends StatefulWidget {
@@ -42,6 +45,16 @@ class _GameScreenState extends State<GameScreen> {
       _aiPoints = prefs.getInt('aiPoints') ?? 0;
       prefs.setInt('qtd_original', widget.qtd);
     });
+  }
+
+  Map<String, dynamic> getReference(String reference) async{
+    DocumentReference gameRef = FirebaseFirestore.instance.doc('game/D99e9YDC3ZtleQ664vMB');
+    
+    DocumentSnapshot snapshot = await gameRef.get();
+
+    Map<String, dynamic> ? gameData = snapshot.data() as Map<String, dynamic>?;
+
+    return gameData;
   }
 
   void removeSticks(int qtd) {
@@ -87,6 +100,28 @@ class _GameScreenState extends State<GameScreen> {
             _aiPoints = points;
             prefs.setInt('aiPoints', points);
         }
+
+        getReference('game/D99e9YDC3ZtleQ664vMB');
+
+        if (gameData != null) {
+          print("Game attributes:");
+          gameData.forEach((key, value) {
+            print("$key: $value");
+          });
+        }
+
+        // se existir jogo
+          // atualizar placar
+        // se não
+        
+        // CollectionReference collRef = FirebaseFirestore.instance.collection('game');
+
+        // collRef.add({
+        //   'aiPoints': _aiPoints,
+        //   'matches': _nMatches,
+        //   'userPoints': _userPoints
+        // });
+        
         return;
       }
       
