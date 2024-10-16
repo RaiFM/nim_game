@@ -47,8 +47,8 @@ class _GameScreenState extends State<GameScreen> {
     });
   }
 
-  Map<String, dynamic> getReference(String reference) async{
-    DocumentReference gameRef = FirebaseFirestore.instance.doc('game/D99e9YDC3ZtleQ664vMB');
+  Future getReferenceData(String reference) async{
+    DocumentReference gameRef = FirebaseFirestore.instance.doc(reference);
     
     DocumentSnapshot snapshot = await gameRef.get();
 
@@ -101,13 +101,15 @@ class _GameScreenState extends State<GameScreen> {
             prefs.setInt('aiPoints', points);
         }
 
-        getReference('game/D99e9YDC3ZtleQ664vMB');
+        Map<String, dynamic> gameData = getReferenceData('game/D99e9YDC3ZtleQ664vMB');
 
         if (gameData != null) {
           print("Game attributes:");
+
           gameData.forEach((key, value) {
             print("$key: $value");
           });
+          
         }
 
         // se existir jogo
