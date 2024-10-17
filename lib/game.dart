@@ -13,6 +13,7 @@ class GameScreen extends StatefulWidget {
 
   GameScreen({required this.qtd}); // Constructor
   late int qtd_original = this.qtd;
+  late String currentGame = 'null';
 
   @override
   _GameScreenState createState() => _GameScreenState();
@@ -47,89 +48,130 @@ class _GameScreenState extends State<GameScreen> {
     });
   }
 
-  Future getReferenceData(String reference) async{
+  Future<Map<String, dynamic>> getReferenceData(String reference) async{
     DocumentReference gameRef = FirebaseFirestore.instance.doc(reference);
     
     DocumentSnapshot snapshot = await gameRef.get();
 
-    Map<String, dynamic> ? gameData = snapshot.data() as Map<String, dynamic>?;
+    Map<String, dynamic> gameData = snapshot.data() != null ? snapshot.data() as Map<String, dynamic> : {};
 
     return gameData;
   }
 
-  void removeSticks(int qtd) {
-    setState(() {
-      widget.qtd -= qtd;
-      int points = 0;
-      String winner = "";
-      _codWinner = 0;
+  void showAlert(String title, String text, int time){
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        // Show the dialog
+        return AlertDialog(
+          title: Text(title),
+          content: Text(text),
+        );
+      },
+    );
 
-      if (widget.qtd <= 1) {
-        if(widget.qtd == 1){
-          if(isPlayerTurn){
-            winner = "Você";
-            points = 1 + (_userPoints ?? 0); //!= null ? _userPoints : 1;
-            _codWinner = 1;
-          }else{
-            winner = "IA";
-            points = (_aiPoints ?? 0) + 1; //!= null ? _userPoints : 1;
-            _codWinner = 2;
-          }
-        }else if(widget.qtd == 0){
-          if(isPlayerTurn){
-            winner = "IA";
-            points = 1 + (_aiPoints ?? 0); 
-            _codWinner = 2;
-          }else{
-            winner = "Você";
-            points = (_userPoints ?? 0) + 1;
-            _codWinner = 1;
-          }
-        }
-
-        qtdButtons = 0;
-        widget.qtd = 0;
-        _turn = "";
-        _result = winner + " venceu!";
-
-        switch(_codWinner){
-          case 1:
-            _userPoints = points;
-            prefs.setInt('userPoints', points);
-          case 2:
-            _aiPoints = points;
-            prefs.setInt('aiPoints', points);
-        }
-
-        Map<String, dynamic> gameData = getReferenceData('game/D99e9YDC3ZtleQ664vMB');
-
-        if (gameData != null) {
-          print("Game attributes:");
-
-          gameData.forEach((key, value) {
-            print("$key: $value");
-          });
-          
-        }
-
-        // se existir jogo
-          // atualizar placar
-        // se não
-        
-        // CollectionReference collRef = FirebaseFirestore.instance.collection('game');
-
-        // collRef.add({
-        //   'aiPoints': _aiPoints,
-        //   'matches': _nMatches,
-        //   'userPoints': _userPoints
-        // });
-        
-        return;
-      }
-      
-      isPlayerTurn = !isPlayerTurn;
-      _turn = isPlayerTurn ? 'Sua Vez' : 'Vez da IA'; // Switch turns
+    // Close the dialog automatically after 3 seconds
+    Future.delayed(Duration(seconds: time), () {
+      Navigator.of(context).pop(); // Close the dialog
     });
+  }
+
+  void removeSticks(int qtd) async{
+    
+    if(qtd <= widget.qtd){
+
+      Map<String, dynamic> gameData = await getReferenceData('game/' + widget.currentGame);
+
+      bool update = false;
+      bool newGame = false;
+      Map<String, dynamic> newData = {};
+
+      setState(() {
+        widget.qtd -= qtd;
+        int points = 0;
+        String winner = "";
+        _codWinner = 0;
+
+        if (widget.qtd <= 1) {
+          if(widget.qtd == 1){
+            if(isPlayerTurn){
+              winner = "Você";
+              points = 1 + (_userPoints ?? 0); //!= null ? _userPoints : 1;
+              _codWinner = 1;
+            }else{
+              winner = "IA";
+              points = (_aiPoints ?? 0) + 1; //!= null ? _userPoints : 1;
+              _codWinner = 2;
+            }
+          }else if(widget.qtd == 0){
+            if(isPlayerTurn){
+              winner = "IA";
+              points = 1 + (_aiPoints ?? 0); 
+              _codWinner = 2;
+            }else{
+              winner = "Você";
+              points = (_userPoints ?? 0) + 1;
+              _codWinner = 1;
+            }
+          }
+
+          qtdButtons = 0;
+          widget.qtd = 0;
+          _turn = "";
+          _result = winner + " venceu!";
+
+          switch(_codWinner){
+            case 1:
+              _userPoints = points;
+              prefs.setInt('userPoints', points);
+            case 2:
+              _aiPoints = points;
+              prefs.setInt('aiPoints', points);
+          }
+
+          if(gameData.isEmpty){
+            newGame = true;
+          }else{
+            newData = {
+              'aiPoints': _aiPoints,
+              'matches': _nMatches,
+              'userPoints': _userPoints
+            };
+
+            update = true;
+          }
+          
+          return;
+        }
+        
+        isPlayerTurn = !isPlayerTurn;
+        _turn = isPlayerTurn ? 'Sua Vez' : 'Vez da IA'; // Switch turns
+      });
+
+      if(newGame){
+        CollectionReference collRef = FirebaseFirestore.instance.collection('game/');
+
+        DocumentReference newGameRef = await collRef.add({
+          'aiPoints': _aiPoints,
+          'matches': _nMatches,
+          'userPoints': _userPoints
+        });
+
+        String newGameId = newGameRef.id;
+
+        widget.currentGame = newGameId;
+        print('New game ' + newGameId);
+
+      }else if(update){
+        
+        DocumentReference gameRef = FirebaseFirestore.instance.doc('game/' + widget.currentGame);
+
+        await gameRef.update(newData);
+        print('Game ' + widget.currentGame + ' updated');
+      }
+    }else{
+      showAlert('Número inválido', 'Selecione um número válido para ser retirado', 2);
+    }
   }
 
   void reestart(context){
@@ -201,6 +243,7 @@ class _GameScreenState extends State<GameScreen> {
                       _turn = "Sua vez";
                       qtdButtons = 3;
                       widget.qtd = qtd;
+                      widget.currentGame = 'null';
 
                       prefs.setInt('userPoints', 0);
                       prefs.setInt('aiPoints', 0);
@@ -208,7 +251,7 @@ class _GameScreenState extends State<GameScreen> {
 
                     Navigator.of(context).pop(); 
                   }else{
-                    print('digite uma quantidade entre 7 e 13');
+                    showAlert('Número inválido', 'Escolha uma quantidade inteira entre 7 e 13', 2);
                   }
                 }catch(e){
                   print('digite uma quantidade válida');

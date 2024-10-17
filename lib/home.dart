@@ -37,10 +37,10 @@ class HomeScreen extends StatelessWidget {
                       MaterialPageRoute(builder: (context) => GameScreen(qtd: this.qtd)),
                     );
                   }else{
-                    print('digite uma quantidade entre 7 e 13');
+                    showAlert(context, 'Número inválido', 'Digite uma quantidade inteira entre 7 e 13', 2);
                   }
                 }catch(e){
-                  print('digite uma quantidade válida');
+                  showAlert(context, 'Número inválido', 'Digite uma quantidade inteira entre 7 e 13', 2);
                 }
               }
             )
@@ -48,6 +48,25 @@ class HomeScreen extends StatelessWidget {
         );
       }
     );
+  }
+
+  void showAlert(BuildContext context, String title, String text, int time){
+    
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        // Show the dialog
+        return AlertDialog(
+          title: Text(title),
+          content: Text(text),
+        );
+      },
+    );
+
+    // Close the dialog automatically after 3 seconds
+    Future.delayed(Duration(seconds: time), () {
+      Navigator.of(context).pop(); // Close the dialog
+    });
   }
 
   Widget build(BuildContext context) {
