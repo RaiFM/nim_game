@@ -170,6 +170,8 @@ class _GameScreenState extends State<GameScreen> {
       result = e.toString();
     }
     
+    searchGames(widget.player);
+
     print(result);
     return result;
   }
@@ -277,7 +279,7 @@ class _GameScreenState extends State<GameScreen> {
       });
 
       if(addGame){
-        await newGame('game/' + widget.currentGame);
+        await newGame('/game');
 
       }else if(update){
         await updateGame(newData, 'game/' + widget.currentGame);
@@ -399,7 +401,7 @@ class _GameScreenState extends State<GameScreen> {
 
                   if(qtd >= 7 && qtd <= 13){
 
-                    newGame('game/' + widget.currentGame);
+                    newGame('/game');
 
                     setState(() {
                       _nMatches = 1;
