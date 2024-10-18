@@ -6,6 +6,7 @@ import 'home.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
+import 'package:restart_app/restart_app.dart';
 
 
 class GameScreen extends StatefulWidget {
@@ -58,7 +59,7 @@ class _GameScreenState extends State<GameScreen> {
     super.initState();
     loadPreferences();
     _turn = "Vez de " + widget.player;
-    // newGame('/game');
+    newGame('/game');
 
     searchGames(widget.player);
   }
@@ -67,43 +68,47 @@ class _GameScreenState extends State<GameScreen> {
 
     _playerGames = [];
 
-    CollectionReference games = FirebaseFirestore.instance.collection('/game');
+    try{
 
-    QuerySnapshot querySnapshot = await games
-    .where('player', isEqualTo: widget.player)
-    // .where('userpoints', isGreaterThan: 'aiPoints') // Adjust this condition as needed
-    // .orderBy('userpoints', descending: true)
-    .limit(5)
-    .get();
+      CollectionReference games = FirebaseFirestore.instance.collection('/game');
 
-    querySnapshot.docs.forEach((doc) {
-      Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+      QuerySnapshot querySnapshot = await games
+      .where('player', isEqualTo: widget.player)// Adjust this condition as needed
+      .orderBy('userPoints', descending: true)
+      .limit(5)
+      .get();
 
-      _playerGames.add(
-        TableRow(children: [
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Text(data['player']),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Text(data['userPoints'].toString()),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Text(data['aiPoints'].toString()),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Text(data['matches'].toString()),
-          ),
-        ]),
-      );
-    });
+      querySnapshot.docs.forEach((doc) {
+        Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
 
-    setState(() {
-      _playerGames = _playerGames;
-    });
+        _playerGames.add(
+          TableRow(children: [
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Text(data['player']),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Text(data['userPoints'].toString()),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Text(data['aiPoints'].toString()),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Text(data['matches'].toString()),
+            ),
+          ]),
+        );
+      });
+
+      setState(() {
+        _playerGames = _playerGames;
+      });
+    }catch(e){
+      print(e.toString());
+    }
   }
 
   void loadPreferences() async{
@@ -318,7 +323,6 @@ class _GameScreenState extends State<GameScreen> {
                   prefs.setInt('userPoints', 0);
                   prefs.setInt('aiPoints', 0);
                 });
-                // askQtd(context); 
               }
             ),
             TextButton(
@@ -520,7 +524,6 @@ class _GameScreenState extends State<GameScreen> {
             ),
           ), 
           Container(
-            padding: EdgeInsets.all(16.0),
             height: (_playerGames.length * 50),
             child: Row(
               children: [
@@ -532,51 +535,56 @@ class _GameScreenState extends State<GameScreen> {
                       2: FlexColumnWidth(0.5),
                       3: FlexColumnWidth(0.5),
                     },
-                      children: [
-                        TableRow(
-                          decoration: BoxDecoration(color: Colors.grey[300]),
-                          children: [
-                            Padding(
-                              padding: const EdgeInsets.all(8.0),
-                              child: Text('Jogador', style: TextStyle(fontWeight: FontWeight.bold)),
-                            ),
-                            Padding(
-                              padding: const EdgeInsets.all(8.0),
-                              child: Text('Pontos Usuário', style: TextStyle(fontWeight: FontWeight.bold)),
-                            ),
-                            Padding(
-                              padding: const EdgeInsets.all(8.0),
-                              child: Text('Pontos IA', style: TextStyle(fontWeight: FontWeight.bold)),
-                            ),
-                            Padding(
-                              padding: const EdgeInsets.all(8.0),
-                              child: Text('Partidas', style: TextStyle(fontWeight: FontWeight.bold)),
-                            ),
-                          ],
-                        ),
-                        ..._playerGames
-                      ],
-                    )
-                ),
-                SizedBox(width: 10),
-                Column(
-                  children: [Row(
                     children: [
-                      TextButton(
-                        onPressed: () {
-                          reestart(context);
-                        }, 
-                        child: Text("Recomeçar")
+                      TableRow(
+                        decoration: BoxDecoration(color: Colors.grey[300]),
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.all(8.0),
+                            child: Text('Jogador', style: TextStyle(fontWeight: FontWeight.bold)),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.all(8.0),
+                            child: Text('Pontos Usuário', style: TextStyle(fontWeight: FontWeight.bold)),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.all(8.0),
+                            child: Text('Pontos IA', style: TextStyle(fontWeight: FontWeight.bold)),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.all(8.0),
+                            child: Text('Partidas', style: TextStyle(fontWeight: FontWeight.bold)),
+                          ),
+                        ],
                       ),
-                      TextButton(
-                        onPressed: () {
-                          startGame(context);
-                        }, 
-                        child: Text("Novo Jogo")
-                      ),
-                    ]
-                  )]
+                      ..._playerGames
+                    ],
+                  )
                 ),
+                SizedBox(
+                  child: Row(
+                      children: [
+                        TextButton(
+                          onPressed: () {
+                            reestart(context);
+                          }, 
+                          child: Text("Recomeçar")
+                        ),
+                        TextButton(
+                          onPressed: () {
+                            startGame(context);
+                          }, 
+                          child: Text("Novo Jogo")
+                        ),
+                        // TextButton(
+                        //   onPressed: () {
+                        //     Restart.restartApp();
+                        //   }, 
+                        //   child: Text("Sair")
+                        // ),
+                      ]
+                    ),
+                )
               ],
             )
           ),
