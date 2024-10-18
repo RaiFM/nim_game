@@ -6,7 +6,9 @@ import 'firebase_options.dart';
 
 class HomeScreen extends StatelessWidget {
   TextEditingController _controllerQtd = new TextEditingController();
+  TextEditingController _controllerName = new TextEditingController();
   int qtd = 0;
+  String name = '';
   
   @override  
   void _showToast(BuildContext context) {
@@ -16,13 +18,26 @@ class HomeScreen extends StatelessWidget {
       builder: (context) {
         return AlertDialog(
           title: Text('Digite a quantidade de palitos'),
-          content: TextField(
-            controller: _controllerQtd,
-            decoration: InputDecoration(
-              labelText: 'Quantidade',
-              hintText: '7 - 13'
-            ),
-            keyboardType: TextInputType.number,
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+                TextField(
+                controller: _controllerName,
+                decoration: InputDecoration(
+                  labelText: 'Nome do Jogador',
+                  hintText: 'Nome'
+                ),
+                // keyboardType: TextInputType.number,
+              ),
+              TextField(
+                controller: _controllerQtd,
+                decoration: InputDecoration(
+                  labelText: 'Quantidade',
+                  hintText: '7 - 13'
+                ),
+                keyboardType: TextInputType.number,
+              )
+            ],
           ),
           actions: [
             TextButton(
@@ -30,14 +45,19 @@ class HomeScreen extends StatelessWidget {
               onPressed: () {
                 try{    
                   qtd = int.parse(_controllerQtd.text);
+                  name = _controllerName.text;
 
-                  if(qtd >= 7 && qtd <= 13){
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => GameScreen(qtd: this.qtd)),
-                    );
+                  if (name != '') {
+                    if(qtd >= 7 && qtd <= 13){
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => GameScreen(qtd: this.qtd, player: this.name)),
+                      );
+                    }else{
+                      showAlert(context, 'Número inválido', 'Digite uma quantidade inteira entre 7 e 13', 2);
+                    }
                   }else{
-                    showAlert(context, 'Número inválido', 'Digite uma quantidade inteira entre 7 e 13', 2);
+                    showAlert(context, 'Nome inválido', 'Digite um nome para o jogador', 2);
                   }
                 }catch(e){
                   showAlert(context, 'Número inválido', 'Digite uma quantidade inteira entre 7 e 13', 2);

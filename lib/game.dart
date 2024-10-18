@@ -10,8 +10,9 @@ import 'firebase_options.dart';
 
 class GameScreen extends StatefulWidget {
   late int qtd; // Accept qtd as a parameterx
+  late String player; // Accept qtd as a parameterx
 
-  GameScreen({required this.qtd}); // Constructor
+  GameScreen({required this.qtd, required this.player}); // Constructor
   late int qtd_original = this.qtd;
   late String currentGame = 'null';
 
@@ -21,29 +22,105 @@ class GameScreen extends StatefulWidget {
 }
 
 class _GameScreenState extends State<GameScreen> {
+
+  // Mastrar de quem é a vez
   bool isPlayerTurn = true;
+  String _turn = "Vez de ";
+
+  // Mostrar resultado final do jogo
   String _result = "";
-  String _turn = "Sua vez";
+  int _codWinner = 0;
+
+  // Controlar pontos
   int? _userPoints = 0;
   int? _aiPoints = 0;
+
+  // Quantidade de botões
   int qtdButtons = 3;
+
+  // Número de partidas
   int _nMatches = 1;
+
+  // Persistencia de dados
   late SharedPreferences prefs;
+
+  // Controller do input de quantidade
   TextEditingController _controllerQtd = new TextEditingController();
-  int _codWinner = 0;
+  
+  // Controlar visibilidade do botão para ir para a próxima partida
+  bool _endGame = false;
+
+  // Partidas anteriores do jogador
+  List<TableRow> _playerGames = [];
 
   @override
   void initState(){
     super.initState();
     loadPreferences();
+    _turn = "Vez de " + widget.player;
+    // newGame('/game');
+
+    searchGames(widget.player);
+  }
+
+  void searchGames(String player) async{
+
+    _playerGames = [];
+
+    CollectionReference games = FirebaseFirestore.instance.collection('/game');
+
+    QuerySnapshot querySnapshot = await games
+    .where('player', isEqualTo: widget.player)
+    // .where('userpoints', isGreaterThan: 'aiPoints') // Adjust this condition as needed
+    // .orderBy('userpoints', descending: true)
+    .limit(5)
+    .get();
+
+    querySnapshot.docs.forEach((doc) {
+      Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+
+      _playerGames.add(
+        TableRow(children: [
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Text(data['player']),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Text(data['userPoints'].toString()),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Text(data['aiPoints'].toString()),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Text(data['matches'].toString()),
+          ),
+        ]),
+      );
+    });
+
+    setState(() {
+      _playerGames = _playerGames;
+    });
   }
 
   void loadPreferences() async{
     prefs = await SharedPreferences.getInstance();
 
     setState(() {
-      _userPoints = prefs.getInt('userPoints') ?? 0;
-      _aiPoints = prefs.getInt('aiPoints') ?? 0;
+
+      if(prefs.getString('lastPlayer') == widget.player){
+        _userPoints = prefs.getInt('userPoints') ?? 0;
+        _aiPoints = prefs.getInt('aiPoints') ?? 0;
+        widget.currentGame = prefs.getString('lastGame') ?? '';
+      }else{
+        prefs.setString('lastPlayer', widget.player);
+        _userPoints = 0;
+        _aiPoints = 0;
+      }
+
       prefs.setInt('qtd_original', widget.qtd);
     });
   }
@@ -76,6 +153,49 @@ class _GameScreenState extends State<GameScreen> {
     });
   }
 
+  Future<String> updateGame(Map<String, dynamic> newData, String reference) async{
+    String result = '';
+    try{
+      DocumentReference gameRef = FirebaseFirestore.instance.doc(reference);
+
+      await gameRef.update(newData);
+      result = 'Game ' + widget.currentGame + ' updated';
+
+    }catch(e){
+      result = e.toString();
+    }
+    
+    print(result);
+    return result;
+  }
+  
+  Future<String> newGame(String reference) async{
+    String result = '';
+    try{
+      CollectionReference collRef = FirebaseFirestore.instance.collection(reference);
+
+        DocumentReference newGameRef = await collRef.add({
+          'aiPoints': 0,
+          'matches': 1,
+          'userPoints': 0,
+          'player': widget.player
+        });
+
+        String newGameId = newGameRef.id;
+
+        widget.currentGame = newGameId;
+
+        result = 'New game ' + widget.currentGame;
+
+    }catch(e){
+      result = e.toString();
+    }
+    
+    print(result);
+    searchGames(widget.player);
+    return result;
+  }
+
   void removeSticks(int qtd) async{
     
     if(qtd <= widget.qtd){
@@ -83,7 +203,7 @@ class _GameScreenState extends State<GameScreen> {
       Map<String, dynamic> gameData = await getReferenceData('game/' + widget.currentGame);
 
       bool update = false;
-      bool newGame = false;
+      bool addGame = false;
       Map<String, dynamic> newData = {};
 
       setState(() {
@@ -95,7 +215,7 @@ class _GameScreenState extends State<GameScreen> {
         if (widget.qtd <= 1) {
           if(widget.qtd == 1){
             if(isPlayerTurn){
-              winner = "Você";
+              winner = widget.player;
               points = 1 + (_userPoints ?? 0); //!= null ? _userPoints : 1;
               _codWinner = 1;
             }else{
@@ -109,7 +229,7 @@ class _GameScreenState extends State<GameScreen> {
               points = 1 + (_aiPoints ?? 0); 
               _codWinner = 2;
             }else{
-              winner = "Você";
+              winner = widget.player;
               points = (_userPoints ?? 0) + 1;
               _codWinner = 1;
             }
@@ -130,45 +250,35 @@ class _GameScreenState extends State<GameScreen> {
           }
 
           if(gameData.isEmpty){
-            newGame = true;
+            addGame = true;
           }else{
             newData = {
               'aiPoints': _aiPoints,
               'matches': _nMatches,
-              'userPoints': _userPoints
+              'userPoints': _userPoints,
+              'player': widget.player
             };
 
             update = true;
           }
+
+          _endGame = true;
           
           return;
         }
         
         isPlayerTurn = !isPlayerTurn;
-        _turn = isPlayerTurn ? 'Sua Vez' : 'Vez da IA'; // Switch turns
+        _turn = isPlayerTurn ? 'Vez de ' + widget.player : 'Vez da IA'; // Switch turns
       });
 
-      if(newGame){
-        CollectionReference collRef = FirebaseFirestore.instance.collection('game/');
-
-        DocumentReference newGameRef = await collRef.add({
-          'aiPoints': _aiPoints,
-          'matches': _nMatches,
-          'userPoints': _userPoints
-        });
-
-        String newGameId = newGameRef.id;
-
-        widget.currentGame = newGameId;
-        print('New game ' + newGameId);
+      if(addGame){
+        await newGame('game/' + widget.currentGame);
 
       }else if(update){
-        
-        DocumentReference gameRef = FirebaseFirestore.instance.doc('game/' + widget.currentGame);
-
-        await gameRef.update(newData);
-        print('Game ' + widget.currentGame + ' updated');
+        await updateGame(newData, 'game/' + widget.currentGame);
       }
+
+      prefs.setString('lastGame', widget.currentGame);
     }else{
       showAlert('Número inválido', 'Selecione um número válido para ser retirado', 2);
     }
@@ -184,9 +294,57 @@ class _GameScreenState extends State<GameScreen> {
           actions: [
             TextButton(
               child: Text('Sim'),
-              onPressed: () {
+              onPressed: () async{
+                Map<String, dynamic> newData = {
+                  'aiPoints': 0,
+                  'matches': 0,
+                  'userPoints': 0,
+                  'player': widget.player
+                };
+
+                await updateGame(newData, 'game/' + widget.currentGame);
 
                 Navigator.of(context).pop(); 
+                setState(() {
+                  _nMatches = 1;
+                  _userPoints = 0;
+                  _aiPoints = 0;
+                  _result = "";
+                  _turn = "Vez de " + widget.player;
+                  qtdButtons = 3;
+
+                  widget.qtd = widget.qtd_original;
+
+                  prefs.setInt('userPoints', 0);
+                  prefs.setInt('aiPoints', 0);
+                });
+                // askQtd(context); 
+              }
+            ),
+            TextButton(
+              child: Text('Não'),
+              onPressed: () {
+                Navigator.of(context).pop(); 
+              }
+            ),
+          ],
+        );
+      }
+    );
+  }
+
+  void startGame(context){
+    final scaffold = ScaffoldMessenger.of(context);
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text('Iniciar um novo jogo?'),
+          actions: [
+            TextButton(
+              child: Text('Sim'),
+              onPressed: () {
+                Navigator.of(context).pop();
                 askQtd(context); 
               }
             ),
@@ -205,9 +363,10 @@ class _GameScreenState extends State<GameScreen> {
   void nextMatch(){
     setState(() {
       _result = "";
-      _turn = "Sua vez";
+      _turn = "Vez de " + widget.player;
       qtdButtons = 3;
       _nMatches++;
+      _endGame = false;
       widget.qtd = prefs.getInt('qtd_original') ?? 0;
     });
   }
@@ -230,20 +389,23 @@ class _GameScreenState extends State<GameScreen> {
           actions: [
             TextButton(
               child: Text('Iniciar'),
-              onPressed: () {
+              onPressed: () async{
                 try{    
                   int qtd = int.parse(_controllerQtd.text);
 
                   if(qtd >= 7 && qtd <= 13){
+
+                    newGame('game/' + widget.currentGame);
+
                     setState(() {
                       _nMatches = 1;
                       _userPoints = 0;
+                      _endGame = false;
                       _aiPoints = 0;
                       _result = "";
-                      _turn = "Sua vez";
+                      _turn = "Vez de " + widget.player;
                       qtdButtons = 3;
                       widget.qtd = qtd;
-                      widget.currentGame = 'null';
 
                       prefs.setInt('userPoints', 0);
                       prefs.setInt('aiPoints', 0);
@@ -254,7 +416,7 @@ class _GameScreenState extends State<GameScreen> {
                     showAlert('Número inválido', 'Escolha uma quantidade inteira entre 7 e 13', 2);
                   }
                 }catch(e){
-                  print('digite uma quantidade válida');
+                  showAlert('Número inválido', 'Escolha uma quantidade inteira entre 7 e 13', 2);
                 }
               }
             )
@@ -323,7 +485,7 @@ class _GameScreenState extends State<GameScreen> {
                 Column(
                   children: [
                     Text(
-                      'Você',
+                      widget.player,
                       style: TextStyle(fontSize: 20, color: Colors.white),
                     ),
                     SizedBox(height: 8),
@@ -336,7 +498,7 @@ class _GameScreenState extends State<GameScreen> {
                 Column(
                   children: [
                     Text(
-                      "Jogo " + _nMatches.toString(),
+                      "Partida " + _nMatches.toString(),
                       style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
                     ),
                   ],
@@ -356,7 +518,69 @@ class _GameScreenState extends State<GameScreen> {
                 ),
               ],
             ),
-          ), Expanded(
+          ), 
+          Container(
+            padding: EdgeInsets.all(16.0),
+            height: (_playerGames.length * 50),
+            child: Row(
+              children: [
+                Expanded(
+                  child:Table(
+                    columnWidths: {
+                      0: FlexColumnWidth(0.5),
+                      1: FlexColumnWidth(0.5),
+                      2: FlexColumnWidth(0.5),
+                      3: FlexColumnWidth(0.5),
+                    },
+                      children: [
+                        TableRow(
+                          decoration: BoxDecoration(color: Colors.grey[300]),
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.all(8.0),
+                              child: Text('Jogador', style: TextStyle(fontWeight: FontWeight.bold)),
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.all(8.0),
+                              child: Text('Pontos Usuário', style: TextStyle(fontWeight: FontWeight.bold)),
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.all(8.0),
+                              child: Text('Pontos IA', style: TextStyle(fontWeight: FontWeight.bold)),
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.all(8.0),
+                              child: Text('Partidas', style: TextStyle(fontWeight: FontWeight.bold)),
+                            ),
+                          ],
+                        ),
+                        ..._playerGames
+                      ],
+                    )
+                ),
+                SizedBox(width: 10),
+                Column(
+                  children: [Row(
+                    children: [
+                      TextButton(
+                        onPressed: () {
+                          reestart(context);
+                        }, 
+                        child: Text("Recomeçar")
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          startGame(context);
+                        }, 
+                        child: Text("Novo Jogo")
+                      ),
+                    ]
+                  )]
+                ),
+              ],
+            )
+          ),
+          Expanded(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -367,23 +591,15 @@ class _GameScreenState extends State<GameScreen> {
                 ),
                 _buildStick(),
                 _buildButtons(),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    TextButton(
-                      onPressed: () {
-                        reestart(context);
-                      },
-                      child: Text('Recomeçar'),
-                    ),
-                    TextButton(
+                Visibility(
+                  visible: _endGame,
+                  child: TextButton(
                       onPressed: () {
                         nextMatch();
                       },
                       child: Text('Proxima Partida'),
                     ),
-                  ],
-                ),
+                )
               ],
             )
             ),
