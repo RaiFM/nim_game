@@ -1,6 +1,6 @@
 name: nim_game
 description: "A new Flutter project."
-publish_to: 'none' # Remove this line if you wish to publish to pub.dev
+publish_to: 'none' 
 
 version: 1.0.0+1
 
@@ -11,6 +11,7 @@ dependencies:
   flutter:
     sdk: flutter
   get: ^4.6.1
+  http: ^0.13.5
 
   shared_preferences: ^2.3.2
 

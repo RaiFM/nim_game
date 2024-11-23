@@ -3,6 +3,7 @@ import 'dart:html';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'home.dart';
+import 'api_python.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
@@ -10,10 +11,10 @@ import 'package:restart_app/restart_app.dart';
 
 
 class GameScreen extends StatefulWidget {
-  late int qtd; // Accept qtd as a parameterx
-  late String player; // Accept qtd as a parameterx
+  late int qtd; 
+  late String player; 
 
-  GameScreen({required this.qtd, required this.player}); // Constructor
+  GameScreen({required this.qtd, required this.player}); 
   late int qtd_original = this.qtd;
   late String currentGame = 'null';
 
@@ -54,60 +55,47 @@ class _GameScreenState extends State<GameScreen> {
   // Partidas anteriores do jogador
   List<TableRow> _playerGames = [];
 
+  // Instancia da api
+  ApiService api = new ApiService();
+
   @override
   void initState(){
     super.initState();
     loadPreferences();
     _turn = "Vez de " + widget.player;
-    newGame('/game');
+    newGame();
 
     searchGames(widget.player);
   }
 
-  void searchGames(String player) async{
-
-    _playerGames = [];
-
-    try{
-
-      CollectionReference games = FirebaseFirestore.instance.collection('/game');
-
-      QuerySnapshot querySnapshot = await games
-      .where('player', isEqualTo: widget.player)// Adjust this condition as needed
-      .orderBy('userPoints', descending: true)
-      .limit(5)
-      .get();
-
-      querySnapshot.docs.forEach((doc) {
-        Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
-
-        _playerGames.add(
-          TableRow(children: [
-            Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: Text(data['player']),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: Text(data['userPoints'].toString()),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: Text(data['aiPoints'].toString()),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: Text(data['matches'].toString()),
-            ),
-          ]),
-        );
-      });
+  void searchGames(String player) async {
+    try {
+      var games = await api.getScores(); 
 
       setState(() {
-        _playerGames = _playerGames;
+        _playerGames = games
+            .map((game) {
+              return TableRow(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: Text(game['nome']),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: Text(game['pontos'].toString()),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: Text('Partida ${game['id']}'),
+                  ),
+                ],
+              );
+            })
+            .toList();
       });
-    }catch(e){
-      print(e.toString());
+    } catch (e) {
+      print('Erro ao buscar jogos: $e');
     }
   }
 
@@ -158,12 +146,13 @@ class _GameScreenState extends State<GameScreen> {
     });
   }
 
-  Future<String> updateGame(Map<String, dynamic> newData, String reference) async{
+  Future<String> updateGame(Map<String, dynamic> newData) async{
     String result = '';
     try{
-      DocumentReference gameRef = FirebaseFirestore.instance.doc(reference);
+      // DocumentReference gameRef = FirebaseFirestore.instance.doc(reference);
 
-      await gameRef.update(newData);
+      // await gameRef.update(newData);
+      await api.updateScore(newData);
       result = 'Game ' + widget.currentGame + ' updated';
 
     }catch(e){
@@ -171,35 +160,32 @@ class _GameScreenState extends State<GameScreen> {
     }
     
     searchGames(widget.player);
-
-    print(result);
     return result;
   }
   
-  Future<String> newGame(String reference) async{
+  Future<String> newGame() async{
     String result = '';
+
     try{
-      CollectionReference collRef = FirebaseFirestore.instance.collection(reference);
+      api.newGame(widget.player, 0);
+    //   CollectionReference collRef = FirebaseFirestore.instance.collection(reference);
 
-        DocumentReference newGameRef = await collRef.add({
-          'aiPoints': 0,
-          'matches': 1,
-          'userPoints': 0,
-          'player': widget.player
-        });
+    //     DocumentReference newGameRef = await collRef.add({
+    //       'aiPoints': 0,
+    //       'matches': 1,
+    //       'userPoints': 0,
+    //       'player': widget.player
+    //     });
 
-        String newGameId = newGameRef.id;
+    //     String newGameId = newGameRef.id;
 
-        widget.currentGame = newGameId;
+    //     widget.currentGame = newGameId;
 
-        result = 'New game ' + widget.currentGame;
+      result = 'New game created';
 
     }catch(e){
       result = e.toString();
     }
-    
-    print(result);
-    searchGames(widget.player);
     return result;
   }
 
@@ -207,7 +193,7 @@ class _GameScreenState extends State<GameScreen> {
     
     if(qtd <= widget.qtd){
 
-      Map<String, dynamic> gameData = await getReferenceData('game/' + widget.currentGame);
+      Map<String, dynamic> gameData = await api.searchScore('game/' + widget.currentGame);
 
       bool update = false;
       bool addGame = false;
@@ -223,11 +209,11 @@ class _GameScreenState extends State<GameScreen> {
           if(widget.qtd == 1){
             if(isPlayerTurn){
               winner = widget.player;
-              points = 1 + (_userPoints ?? 0); //!= null ? _userPoints : 1;
+              points = 1 + (_userPoints ?? 0); 
               _codWinner = 1;
             }else{
               winner = "IA";
-              points = (_aiPoints ?? 0) + 1; //!= null ? _userPoints : 1;
+              points = (_aiPoints ?? 0) + 1;
               _codWinner = 2;
             }
           }else if(widget.qtd == 0){
@@ -260,10 +246,11 @@ class _GameScreenState extends State<GameScreen> {
             addGame = true;
           }else{
             newData = {
-              'aiPoints': _aiPoints,
-              'matches': _nMatches,
-              'userPoints': _userPoints,
-              'player': widget.player
+              // 'aiPoints': _aiPoints,
+              // 'matches': _nMatches,
+              'id': widget.currentGame,
+              'pontos': _userPoints,
+              'nome': widget.player
             };
 
             update = true;
@@ -279,10 +266,9 @@ class _GameScreenState extends State<GameScreen> {
       });
 
       if(addGame){
-        await newGame('/game');
-
+        await newGame();
       }else if(update){
-        await updateGame(newData, 'game/' + widget.currentGame);
+        await updateGame(newData);
       }
 
       prefs.setString('lastGame', widget.currentGame);
@@ -303,13 +289,14 @@ class _GameScreenState extends State<GameScreen> {
               child: Text('Sim'),
               onPressed: () async{
                 Map<String, dynamic> newData = {
-                  'aiPoints': 0,
-                  'matches': 0,
-                  'userPoints': 0,
-                  'player': widget.player
+                  // 'aiPoints': 0,
+                  // 'matches': 0,
+                  'id': widget.currentGame,
+                  'pontos': 0,
+                  'nome': widget.player
                 };
 
-                await updateGame(newData, 'game/' + widget.currentGame);
+                await updateGame(newData);
 
                 Navigator.of(context).pop(); 
                 setState(() {
@@ -401,7 +388,7 @@ class _GameScreenState extends State<GameScreen> {
 
                   if(qtd >= 7 && qtd <= 13){
 
-                    newGame('/game');
+                    newGame();
 
                     setState(() {
                       _nMatches = 1;
@@ -578,12 +565,6 @@ class _GameScreenState extends State<GameScreen> {
                           }, 
                           child: Text("Novo Jogo")
                         ),
-                        // TextButton(
-                        //   onPressed: () {
-                        //     Restart.restartApp();
-                        //   }, 
-                        //   child: Text("Sair")
-                        // ),
                       ]
                     ),
                 )
